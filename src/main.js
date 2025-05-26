@@ -37,6 +37,10 @@ export default async ({ req, res, log, error }) => {
 
     log(`Sending notification: ${title}`)
 
+    // Generate unique message ID
+    const messageId = `push-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    log(`Generated messageId: ${messageId}`)
+
     // Get all push targets from Appwrite
     const targetsResponse = await messaging.listTargets()
     const pushTargets = targetsResponse.targets.filter((target) => target.providerType === "push")
@@ -78,19 +82,26 @@ export default async ({ req, res, log, error }) => {
       })
     }
 
+    // Prepare notification data
+    const notificationData = {
+      type: type || "general",
+      timestamp: new Date().toISOString(),
+      ...customData,
+    }
+
+    log(`Sending push notification with messageId: ${messageId}`)
+    log(`Target IDs: ${JSON.stringify(targetIds)}`)
+    log(`Notification data: ${JSON.stringify(notificationData)}`)
+
     // Send push notification to targets
     const messageResponse = await messaging.createPush(
-      `push-${Date.now()}`, // messageId
+      messageId, // Required messageId parameter
       title,
       body,
-      [], // topics
-      [], // users
+      [], // topics (empty array for no topics)
+      [], // users (empty array to use targets instead)
       targetIds, // specific targets
-      {
-        type: type || "general",
-        timestamp: new Date().toISOString(),
-        ...customData,
-      }, // data
+      notificationData, // data payload
       null, // action
       null, // image
       null, // icon
@@ -138,6 +149,7 @@ export default async ({ req, res, log, error }) => {
     })
   } catch (err) {
     error("Failed to send push notification: " + err.message)
+    log("Full error details: " + JSON.stringify(err))
     return res.json({
       success: false,
       error: err.message,
